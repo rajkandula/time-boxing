@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Timebox — Focused Study Planner</title>
+  <meta name="description" content="Plan your study day in time boxes, focus with a built-in timer, and review your progress. Works offline. No account: your data stays on your device.">
+  <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0c1018" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <meta property="og:title" content="Timebox — Focused Study Planner">
+  <meta property="og:description" content="Brain dump, pick your top 3, box your day, focus, review. Free, offline, no sign-up.">
+  <meta property="og:type" content="website">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Timebox">
+  <link rel="stylesheet" href="css/styles.css">
+  <script>
+    // Apply a saved light/dark choice before first paint to avoid a flash.
+    try {
+      var t = (JSON.parse(localStorage.getItem('timebox:v1') || '{}').settings || {}).theme;
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="./" aria-label="Timebox home">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+          <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+          <rect width="32" height="32" rx="9" fill="url(#lg)"/>
+          <circle cx="16" cy="16" r="8.5" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="3"/>
+          <path d="M16 7.5a8.5 8.5 0 1 1-8.5 8.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="16" cy="16" r="2.2" fill="#fff"/>
+        </svg>
+        <span>Timebox</span>
+      </a>
+
+      <nav class="tabs" role="tablist" aria-label="Views">
+        <button class="tab" role="tab" id="tab-plan" aria-controls="view-plan" aria-selected="true" data-view="plan">
+          <i data-icon="calendar"></i><span>Plan</span>
+        </button>
+        <button class="tab" role="tab" id="tab-focus" aria-controls="view-focus" aria-selected="false" tabindex="-1" data-view="focus">
+          <i data-icon="clock"></i><span>Focus</span><span class="tab-live" id="tab-live" hidden></span>
+        </button>
+        <button class="tab" role="tab" id="tab-review" aria-controls="view-review" aria-selected="false" tabindex="-1" data-view="review">
+          <i data-icon="target"></i><span>Review</span>
+        </button>
+      </nav>
+
+      <div class="top-actions">
+        <button id="btn-install" class="btn btn-ghost btn-sm install-btn" type="button" hidden><i data-icon="install"></i><span>Install</span></button>
+        <button id="btn-theme" class="icon-btn" type="button" aria-label="Change theme" title="Theme"><i data-icon="monitor"></i></button>
+        <button id="btn-help" class="icon-btn" type="button" aria-label="How it works and shortcuts" title="Help (?)"><i data-icon="help"></i></button>
+        <button id="btn-settings" class="icon-btn" type="button" aria-label="Settings" title="Settings"><i data-icon="settings"></i></button>
+      </div>
+    </div>
+  </header>
+
+  <button id="mini-timer" class="mini-timer" type="button" hidden>
+    <span class="mini-dot" aria-hidden="true"></span>
+    <span id="mini-label" class="mini-label"></span>
+    <span id="mini-time" class="mini-time"></span>
+  </button>
+
+  <main id="main" tabindex="-1">
+    <!-- PLAN -->
+    <section id="view-plan" class="view" role="tabpanel" aria-labelledby="tab-plan">
+      <div class="day-bar">
+        <div class="day-nav">
+          <button id="day-prev" class="icon-btn" type="button" aria-label="Previous day" title="Previous day (←)"><i data-icon="left"></i></button>
+          <div class="day-heading">
+            <h1 id="day-title">Today</h1>
+            <p id="day-subtitle" class="muted"></p>
+          </div>
+          <button id="day-next" class="icon-btn" type="button" aria-label="Next day" title="Next day (→)"><i data-icon="right"></i></button>
+          <button id="day-today" class="btn btn-ghost btn-sm" type="button" hidden>Back to today</button>
+        </div>
+        <div id="carry-banner" class="banner" hidden>
+          <i data-icon="carry"></i>
+          <span id="carry-text"></span>
+          <button id="btn-carry" class="btn btn-sm btn-soft" type="button">Bring them here</button>
+        </div>
+      </div>
+
+      <div class="plan-grid">
+        <section class="card dump-card" aria-labelledby="dump-heading">
+          <div class="card-head">
+            <h2 id="dump-heading"><i data-icon="inbox"></i>Brain dump</h2>
+            <span id="dump-count" class="count"></span>
+          </div>
+          <p class="card-hint">Empty your head first: list everything you need to study. Star your top&nbsp;3, then box them into your day.</p>
+          <form id="dump-form" class="add-row" autocomplete="off">
+            <label for="dump-input" class="sr-only">New task</label>
+            <input id="dump-input" type="text" maxlength="160" placeholder="e.g. Chemistry problem set #chem 45m" enterkeyhint="done">
+            <button class="btn btn-primary btn-square" type="submit" aria-label="Add task"><i data-icon="plus"></i></button>
+          </form>
+
+          <h3 class="subhead"><i data-icon="star" data-size="15"></i>Top 3 priorities</h3>
+          <ol id="priority-list" class="task-list"></ol>
+          <p id="priority-empty" class="empty-sm">Star up to three tasks that matter most.</p>
+
+          <h3 class="subhead">Everything else</h3>
+          <ul id="dump-list" class="task-list"></ul>
+          <p id="dump-empty" class="empty-sm">Nothing here yet. Add every task, big or small.</p>
+        </section>
+
+        <section class="card schedule-card" aria-labelledby="schedule-heading">
+          <div class="card-head">
+            <h2 id="schedule-heading"><i data-icon="calendar"></i>Time boxes</h2>
+            <div class="start-ctl">
+              <label for="day-start">Starts</label>
+              <input id="day-start" type="time" step="300">
+              <button id="btn-start-now" class="btn btn-ghost btn-sm" type="button" title="Start the plan from the current time">Now</button>
+            </div>
+          </div>
+
+          <div class="summary">
+            <p id="day-summary" class="summary-text"></p>
+            <div id="day-progress" class="progress" role="progressbar" aria-label="Boxes finished" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+          </div>
+
+          <ol id="box-list" class="box-list" aria-label="Time boxes for this day"></ol>
+          <div id="box-empty" class="empty">
+            <i data-icon="calendar" data-size="30"></i>
+            <p><strong>No time boxes yet</strong>Add one below, or box a task from your brain dump with <span class="kbd-inline">→</span>.</p>
+          </div>
+
+          <form id="box-form" class="box-form" autocomplete="off">
+            <div class="box-form-row">
+              <label for="box-title" class="sr-only">What will you work on?</label>
+              <input id="box-title" type="text" maxlength="160" placeholder="Add a time box… e.g. Read chapter 4" required>
+              <label for="box-subject" class="sr-only">Subject</label>
+              <input id="box-subject" class="subject-input" type="text" maxlength="40" placeholder="Subject" list="subject-options">
+            </div>
+            <div class="box-form-row">
+              <div class="chips" id="duration-chips" role="radiogroup" aria-label="Length">
+                <button type="button" class="chip" role="radio" aria-checked="false" data-min="15">15m</button>
+                <button type="button" class="chip" role="radio" aria-checked="true" data-min="25">25m</button>
+                <button type="button" class="chip" role="radio" aria-checked="false" data-min="45">45m</button>
+                <button type="button" class="chip" role="radio" aria-checked="false" data-min="60">1h</button>
+                <button type="button" class="chip" role="radio" aria-checked="false" data-min="90">1h 30m</button>
+              </div>
+              <div class="minutes-field">
+                <label for="box-minutes" class="sr-only">Minutes</label>
+                <input id="box-minutes" class="num-input" type="number" min="1" max="480" step="1" value="25" inputmode="numeric">
+                <span class="muted">min</span>
+              </div>
+              <button class="btn btn-primary" type="submit"><i data-icon="plus"></i>Add box</button>
+            </div>
+          </form>
+          <datalist id="subject-options"></datalist>
+        </section>
+      </div>
+    </section>
+
+    <!-- FOCUS -->
+    <section id="view-focus" class="view" role="tabpanel" aria-labelledby="tab-focus" hidden>
+      <div class="focus-grid">
+        <div id="focus-card" class="card focus-card" data-phase="idle">
+          <div id="phase-pill" class="phase-pill">Ready</div>
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="0 0 220 220" aria-hidden="true">
+              <circle class="ring-track" cx="110" cy="110" r="100"/>
+              <circle id="ring-progress" class="ring-progress" cx="110" cy="110" r="100"/>
+            </svg>
+            <div class="ring-center">
+              <div id="timer-display" class="timer-display" role="timer" aria-live="off">25:00</div>
+              <div id="timer-title" class="timer-title"></div>
+              <div id="timer-subject" class="timer-subject"></div>
+            </div>
+          </div>
+          <p id="focus-goal" class="focus-goal" hidden></p>
+
+          <div class="controls">
+            <button id="ctl-stop" class="ctl" type="button" aria-label="Stop" title="Stop"><i data-icon="stop"></i></button>
+            <button id="ctl-main" class="ctl ctl-main" type="button"><span id="ctl-main-icon"></span><span id="ctl-main-label">Start</span></button>
+            <button id="ctl-extend" class="ctl" type="button" aria-label="Add 5 minutes" title="+5 minutes (E)">+5</button>
+            <button id="ctl-finish" class="ctl" type="button" aria-label="Finish box" title="Finish box (F)"><i data-icon="check"></i></button>
+            <button id="ctl-skip" class="ctl" type="button" aria-label="Skip" title="Skip (S)"><i data-icon="skip"></i></button>
+          </div>
+          <div id="cycle-dots" class="cycle" role="img"></div>
+          <p id="focus-hint" class="focus-hint"></p>
+        </div>
+
+        <aside class="focus-side">
+          <section class="card" aria-labelledby="upnext-heading">
+            <div class="card-head">
+              <h2 id="upnext-heading">Up next today</h2>
+              <span id="upnext-meta" class="count"></span>
+            </div>
+            <ol id="upnext-list" class="upnext"></ol>
+            <p id="upnext-empty" class="empty-sm">No boxes waiting. Plan more on the Plan tab, or start a quick box.</p>
+          </section>
+
+          <section class="card" aria-labelledby="quick-heading">
+            <div class="card-head"><h2 id="quick-heading"><i data-icon="bolt"></i>Quick box</h2></div>
+            <p class="card-hint">No plan yet? Box one task right now.</p>
+            <form id="quick-form" class="quick-form" autocomplete="off">
+              <label for="quick-title" class="sr-only">What are you studying?</label>
+              <input id="quick-title" type="text" maxlength="160" placeholder="What are you studying?">
+              <div class="chips">
+                <button type="submit" class="chip" data-min="15">15m</button>
+                <button type="submit" class="chip" data-min="25">25m</button>
+                <button type="submit" class="chip" data-min="50">50m</button>
+                <button type="submit" class="chip" data-min="90">90m</button>
+              </div>
+            </form>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <!-- REVIEW -->
+    <section id="view-review" class="view" role="tabpanel" aria-labelledby="tab-review" hidden>
+      <div class="review-head">
+        <div>
+          <h1 id="review-title">Review</h1>
+          <p id="review-sub" class="muted"></p>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="card stat">
+          <div class="stat-label"><i data-icon="clock" data-size="16"></i>Focus time</div>
+          <div id="stat-focus" class="stat-value">0m</div>
+          <div class="goal-bar"><span id="stat-goal-bar"></span></div>
+          <div id="stat-focus-sub" class="stat-sub"></div>
+        </div>
+        <div class="card stat">
+          <div class="stat-label"><i data-icon="check" data-size="16"></i>Boxes finished</div>
+          <div id="stat-done" class="stat-value">0</div>
+          <div id="stat-done-sub" class="stat-sub"></div>
+        </div>
+        <div class="card stat">
+          <div class="stat-label"><i data-icon="target" data-size="16"></i>Goals met</div>
+          <div id="stat-met" class="stat-value">—</div>
+          <div id="stat-met-sub" class="stat-sub"></div>
+        </div>
+        <div class="card stat">
+          <div class="stat-label"><i data-icon="flame" data-size="16"></i>Streak</div>
+          <div id="stat-streak" class="stat-value">0</div>
+          <div id="stat-streak-sub" class="stat-sub"></div>
+        </div>
+      </div>
+
+      <div class="review-grid">
+        <section class="card" aria-labelledby="week-heading">
+          <div class="card-head"><h2 id="week-heading">Last 7 days</h2><span id="week-total" class="count"></span></div>
+          <div id="week-chart" class="week-chart"></div>
+        </section>
+        <section class="card" aria-labelledby="subject-heading">
+          <div class="card-head"><h2 id="subject-heading">By subject</h2><span class="count">Last 7 days</span></div>
+          <div id="subject-chart" class="subject-chart"></div>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="log-heading">
+        <div class="card-head"><h2 id="log-heading">Session log</h2></div>
+        <ol id="log-list" class="log-list"></ol>
+        <p id="log-empty" class="empty-sm">Finished boxes and your notes will show up here.</p>
+      </section>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p><i data-icon="shield" data-size="14"></i>No account. Your plans are saved only in this browser on this device.</p>
+  </footer>
+
+  <!-- Reflection when a focus box ends -->
+  <dialog id="dlg-outcome" class="dialog" aria-labelledby="outcome-title">
+    <form id="outcome-form" class="dlg-body">
+      <div class="dlg-badge"><i data-icon="check" data-size="22"></i></div>
+      <h2 id="outcome-title">Time's up!</h2>
+      <p id="outcome-box" class="muted"></p>
+      <fieldset class="outcome-options">
+        <legend>Did you reach the goal for this box?</legend>
+        <label class="opt opt-met"><input type="radio" name="outcome" value="met" checked><span>Goal met</span></label>
+        <label class="opt opt-partial"><input type="radio" name="outcome" value="partial"><span>Partly</span></label>
+        <label class="opt opt-missed"><input type="radio" name="outcome" value="missed"><span>Not yet</span></label>
+      </fieldset>
+      <label for="outcome-note" class="field-label">Note for later <span class="muted">(optional)</span></label>
+      <textarea id="outcome-note" rows="2" maxlength="1000" placeholder="What did you finish? What is left?"></textarea>
+      <div class="dlg-actions">
+        <button type="button" class="btn btn-ghost" id="outcome-extend">I need 5 more minutes</button>
+        <button type="submit" class="btn btn-primary" id="outcome-save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Edit a time box -->
+  <dialog id="dlg-edit" class="dialog" aria-labelledby="edit-title">
+    <form id="edit-form" class="dlg-body" autocomplete="off">
+      <div class="dlg-head">
+        <h2 id="edit-title">Edit time box</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+      </div>
+      <label class="field"><span>Task</span><input id="edit-name" type="text" maxlength="120" required></label>
+      <div class="field-row">
+        <label class="field"><span>Subject</span><input id="edit-subject" type="text" maxlength="40" list="subject-options"></label>
+        <label class="field field-sm"><span>Minutes</span><input id="edit-minutes" type="number" min="1" max="480" required inputmode="numeric"></label>
+      </div>
+      <label class="field"><span>Goal: what does “done” look like?</span><input id="edit-goal" type="text" maxlength="300" placeholder="e.g. Finish problems 1–10 and check answers"></label>
+      <label class="field"><span>Status</span>
+        <select id="edit-status">
+          <option value="todo">To do</option>
+          <option value="done">Finished</option>
+          <option value="skipped">Skipped</option>
+        </select>
+      </label>
+      <div class="dlg-actions split">
+        <div class="dlg-actions-left">
+          <button type="button" class="btn btn-ghost btn-danger-text" id="edit-delete"><i data-icon="trash"></i>Delete</button>
+          <button type="button" class="btn btn-ghost" id="edit-to-dump"><i data-icon="inbox"></i>Back to brain dump</button>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Settings -->
+  <dialog id="dlg-settings" class="dialog dialog-wide" aria-labelledby="settings-title">
+    <form id="settings-form" class="dlg-body" autocomplete="off">
+      <div class="dlg-head">
+        <h2 id="settings-title">Settings</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+      </div>
+
+      <fieldset class="set-group">
+        <legend>Timer</legend>
+        <div class="set-grid">
+          <label class="field"><span>Focus box (min)</span><input type="number" name="focusMinutes" min="1" max="240" inputmode="numeric"></label>
+          <label class="field"><span>Short break (min)</span><input type="number" name="shortBreakMinutes" min="0" max="60" inputmode="numeric"></label>
+          <label class="field"><span>Long break (min)</span><input type="number" name="longBreakMinutes" min="0" max="120" inputmode="numeric"></label>
+          <label class="field"><span>Long break every</span><input type="number" name="longBreakEvery" min="0" max="12" inputmode="numeric"></label>
+        </div>
+        <div class="presets">
+          <span class="muted">Presets</span>
+          <button type="button" class="chip" data-preset="25,5,15,4">Pomodoro 25 / 5</button>
+          <button type="button" class="chip" data-preset="50,10,20,3">Deep work 50 / 10</button>
+          <button type="button" class="chip" data-preset="90,20,30,2">Ultradian 90 / 20</button>
+        </div>
+      </fieldset>
+
+      <fieldset class="set-group">
+        <legend>Flow</legend>
+        <label class="switch"><input type="checkbox" name="includeBreaks"><span>Show breaks between boxes in the day plan</span></label>
+        <label class="switch"><input type="checkbox" name="autoStartBreaks"><span>Start breaks automatically</span></label>
+        <label class="switch"><input type="checkbox" name="autoStartNext"><span>Start the next box when a break ends</span></label>
+        <label class="switch"><input type="checkbox" name="keepAwake"><span>Keep the screen on while the timer runs</span></label>
+        <div class="set-grid">
+          <label class="field"><span>Default day start</span><input type="time" name="dayStart" step="300"></label>
+          <label class="field"><span>Daily focus goal (hours)</span><input type="number" name="dailyGoalHours" min="0" max="24" step="0.5" inputmode="decimal"></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="set-group">
+        <legend>Alerts</legend>
+        <label class="switch"><input type="checkbox" name="sound"><span>Chime when time is up</span></label>
+        <div class="range-row">
+          <label for="set-volume">Volume</label>
+          <input id="set-volume" type="range" name="volume" min="0" max="1" step="0.05">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-test-sound">Test</button>
+        </div>
+        <label class="switch"><input type="checkbox" name="notifications"><span>System notifications when a box or break ends</span></label>
+        <p id="notif-note" class="field-note"></p>
+      </fieldset>
+
+      <fieldset class="set-group">
+        <legend>Appearance</legend>
+        <div class="segmented" role="radiogroup" aria-label="Theme">
+          <label><input type="radio" name="theme" value="system"><span>System</span></label>
+          <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+          <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="set-group">
+        <legend>Your data</legend>
+        <p class="field-note"><i data-icon="shield" data-size="15"></i>No account needed. Everything is saved in this browser on this device and is never uploaded anywhere.</p>
+        <p id="storage-note" class="field-note"></p>
+        <div class="data-actions">
+          <button type="button" class="btn btn-ghost" id="btn-export"><i data-icon="download"></i>Export backup</button>
+          <button type="button" class="btn btn-ghost" id="btn-import"><i data-icon="upload"></i>Import backup</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+          <button type="button" class="btn btn-ghost btn-danger-text" id="btn-clear"><i data-icon="trash"></i>Clear all data</button>
+        </div>
+      </fieldset>
+    </form>
+  </dialog>
+
+  <!-- Help -->
+  <dialog id="dlg-help" class="dialog" aria-labelledby="help-title">
+    <div class="dlg-body">
+      <div class="dlg-head">
+        <h2 id="help-title">How timeboxing works</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+      </div>
+      <ol class="steps">
+        <li><strong>Brain dump.</strong> Write down everything you need to study, so it stops circling in your head.</li>
+        <li><strong>Pick your top 3.</strong> Star the tasks that matter most. Do those first.</li>
+        <li><strong>Box them.</strong> Give each task a fixed block of time and a clear goal.</li>
+        <li><strong>Focus.</strong> Work on one box until the timer ends. When time is up, stop and take a break.</li>
+        <li><strong>Review.</strong> Note how it went, then plan tomorrow’s boxes with what you learned.</li>
+      </ol>
+      <h3 class="help-sub">Keyboard shortcuts</h3>
+      <dl class="kbd-list">
+        <div><dt><kbd>Space</kbd></dt><dd>Start or pause the timer</dd></div>
+        <div><dt><kbd>N</kbd></dt><dd>New brain-dump task</dd></div>
+        <div><dt><kbd>B</kbd></dt><dd>New time box</dd></div>
+        <div><dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></dt><dd>Plan, Focus, Review</dd></div>
+        <div><dt><kbd>F</kbd></dt><dd>Finish the current box</dd></div>
+        <div><dt><kbd>E</kbd></dt><dd>Add 5 minutes</dd></div>
+        <div><dt><kbd>S</kbd></dt><dd>Skip box or break</dd></div>
+        <div><dt><kbd>←</kbd><kbd>→</kbd></dt><dd>Previous or next day</dd></div>
+        <div><dt><kbd>?</kbd></dt><dd>Show this help</dd></div>
+      </dl>
+      <p class="field-note">Tip: type <code>#subject</code> and a length such as <code>45m</code> or <code>1h30m</code> when you add a task, e.g. <code>Essay outline #english 50m</code>.</p>
+    </div>
+  </dialog>
+
+  <!-- Confirm -->
+  <dialog id="dlg-confirm" class="dialog dialog-sm" aria-labelledby="confirm-title">
+    <form method="dialog" class="dlg-body">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-message" class="muted"></p>
+      <div class="dlg-actions">
+        <button class="btn btn-ghost" value="cancel">Cancel</button>
+        <button class="btn btn-primary" id="confirm-ok" value="ok">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="announcer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+  <noscript><p class="noscript">Timebox needs JavaScript to run.</p></noscript>
+</body>
+</html>
